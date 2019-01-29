@@ -13,10 +13,6 @@ folder in there; not just the files. You will end up with a folder like
 You may have to customize a few commands for your environment. There currently
 is no clean way to do this aside from editing the source.
 
-TestCreds.psm1 -
-* Fill in $smtp with an internal smtp relay. Some cmdlets use this.
-* Fill in $from with a sender for emails. Some cmdlets use this.
-
 
 Usage
 -----
@@ -39,14 +35,14 @@ the correct format.
     PS C:> Test-CredentialsFile -Path c:\dumps.txt -OutCSV c:\results.csv
 
 results.csv will now be a CSV with these headers:
-  EmailAddress:     obtained from the input file
-  SamAccountName:   Account name from AD, if found
-  DisplayName:      DisplayName from AD, if found
-  PasswordChecked:  True/False if we actually checked the password
-  FoundInAD:        True/False did we find the account in AD?
-  Notes:            Diagnostic info about the results
-  PasswordWorks:    True/False if True, then the Password works!
-  Password:        obtained from the input file
+* EmailAddress:     obtained from the input file
+* SamAccountName:   Account name from AD, if found
+* DisplayName:      DisplayName from AD, if found
+* PasswordChecked:  True/False if we actually checked the password
+* FoundInAD:        True/False did we find the account in AD?
+* Notes:            Diagnostic info about the results
+* PasswordWorks:    True/False if True, then the Password works!
+* Password:        obtained from the input file
 
 If FoundInAD is TRUE, then Test-CredentialsFile found a corresponding user for 
 the EmailAddress. If PasswordWorks is TRUE, then the supplied password IS VALID.
