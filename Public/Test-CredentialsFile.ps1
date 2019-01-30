@@ -2,18 +2,31 @@
 .Synopsis
    Quickly check a data breach file to see if emails and passwords are concerning
 .DESCRIPTION
-   Given a file with lines of the form:
+   Test-CredentialsFile checks whether that userinfo corresponds to a valid user
+   in AD, and then whether or not the supplied password works. It does this by 
+   actually trying the password. (See the notes below)
 
-        userinfo:password
+   
 
-   'userinfo' can be any information about the user. Most likely an email address.
-   SamAccountName, email address, phone number, employee ID, etc. See Search-ADUser for more.
+.NOTES
+   Extremely common or short userinfo values are likely to match many many many
+   user accounts. You may not like that.
+   
+   Test-CredentialsFile actually tries to authenticate using the passwords in
+   the dump file. This is the only way to reliably check. It does try very hard 
+   not to lock out user accounts. Here are the safeguards in place:
+   * A password is only tried when a corresponding user account is found (it
+      does not spray passwords across all accounts)
+   * If too many user accounts are found for a line, it assumes they are false-
+      positives and declines to check them.
+   * The password is checked against the Domain password policy. If it couldn't
+      possibly be a valid password, it is not checked.
+   * If the user account has had a failed login within the the lockout review
+      window, the password is not tried.
+   * After the passwords are checked, Test-CredentialsFile periodically monitors
+      all accounts until the lockout review window is over and alerts you if
+      any accounts lock out.
 
-   Note that extremely short userinfo values are likely to match many many many users. You
-   may not like that.
-
-   Test-CredentialsFile checks whether that userinfo corresponds to a valid user in AD,
-   and then whether or not the supplied password works.
 .EXAMPLE
    Get-Content c:\creds.txt | Test-CredentialsFile
 
@@ -29,8 +42,42 @@
 .EXAMPLE
    "user:foo123" | Test-CredentialsFile
 
-   Use at your own risk! This searches AD for users matching the term "user",
-   potentially getting many results, and then checks each of them.
+   Searches AD for users matching the term "user" and then checks each of them.
+   
+.INPUTS
+   Credential dumps can be handled in one of three ways. You can supply a few
+   credentials on the commandline (or via a pipe). You can supply a path to a
+   colon-separated dump file. Or you can supply a path to a CSV.
+   
+   The colon-separated format looks like this:
+
+        userinfo:password
+
+   The CSV format can have any number of columns as long as there is a userinfo 
+   field and a password field. The userinfo field can be named name, username, 
+   logon, user, accountname, account, email, mail, or samaccountname. The 
+   password field can be named password, pass, pw, passwd, clear, cleartext, or
+   cracked.
+
+   Regardless of what the CSV column is named, 'userinfo' can be any information
+   about the account such as their email address, username, real name, etc.
+   Test-CredentialsFile tries to match on a lot of possible user info fields,
+   see the help for Search-ADUser for more details.
+
+.OUTPUTS
+   Test-CredentialsFile outputs objects with these properties:
+   * EmailAddress:     obtained from the input file
+   * SamAccountName:   Account name from AD, if found
+   * DisplayName:      DisplayName from AD, if found
+   * PasswordChecked:  True/False if we actually checked the password
+   * FoundInAD:        True/False did we find the account in AD?
+   * Notes:            Diagnostic info about the results
+   * PasswordWorks:    True/False if True, then the Password works!
+   * Password:        obtained from the input file
+   
+   If FoundInAD is TRUE, then Test-CredentialsFile found a corresponding user 
+   for the EmailAddress. If PasswordWorks is TRUE, then the supplied password IS
+   VALID. That is bad.
 #>
 function Test-CredentialsFile
 {
@@ -78,14 +125,14 @@ function Test-CredentialsFile
         [Parameter(Mandatory=$false,
             ParameterSetName="FromPipe",
             ValueFromPipelinebyPropertyName=$true)]
-        [Alias('Username','SamAccountName','user','logon','accountname','email','mail')]
+        [Alias('username', 'logon', 'user', 'accountname', 'account', 'email', 'mail', 'samaccountname')]
         [String[]]$Name,
 
         #Pipe in objects with a Name and Password attribute
         [Parameter(Mandatory=$false,
             ParameterSetName="FromPipe",
             ValueFromPipelinebyPropertyName=$true)]
-        [Alias('pass','passwd','clear','cleartext','cracked')]
+        [Alias('pass', 'pw', 'passwd', 'clear', 'cleartext', 'cracked')]
         [String[]]$Password,
         
         #Should Test-CredentialsFile tries again with just the username if it detects an email address. This turns that off.
@@ -368,9 +415,8 @@ function Test-CredentialsFile
 
         function get_fields($obj) {
             $x = Get-Member -InputObject $headercheck -MemberType NoteProperty
-            $u = $x | Where-Object -Property Name -In @('username', 'user', 'accountname', 'account', 'email', 'mail', 'samaccountname')
-            $p = $x | Where-Object -Property Name -In @('password', 'pass', 'pw')
-
+            $u = $x | Where-Object -Property Name -In @('name', 'username', 'logon', 'user', 'accountname', 'account', 'email', 'mail', 'samaccountname')
+            $p = $x | Where-Object -Property Name -In @('password', 'pass', 'pw', 'passwd', 'clear', 'cleartext', 'cracked')
             if ($u) {
                 $u = $obj.($u[0].Name)
             } else {
