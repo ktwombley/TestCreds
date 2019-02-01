@@ -414,7 +414,7 @@ function Test-CredentialsFile
         }
 
         function get_fields($obj) {
-            $x = Get-Member -InputObject $headercheck -MemberType NoteProperty
+            $x = Get-Member -InputObject $obj -MemberType NoteProperty
             $u = $x | Where-Object -Property Name -In @('name', 'username', 'logon', 'user', 'accountname', 'account', 'email', 'mail', 'samaccountname')
             $p = $x | Where-Object -Property Name -In @('password', 'pass', 'pw', 'passwd', 'clear', 'cleartext', 'cracked')
             if ($u) {
