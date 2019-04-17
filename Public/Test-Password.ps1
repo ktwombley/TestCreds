@@ -143,6 +143,7 @@ function Test-PasswordValidates
     [CmdletBinding()]
     [Alias()]
     [OutputType([int])]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingPlainTextForPassword", "", Justification="Used for validating plain-text passwords in the first place")]
     Param
     (
         # Whose password are we checking
