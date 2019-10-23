@@ -35,7 +35,7 @@ function Select-Unique {
 			if ($inp -ne $null) {
                 $k = $inp | ConvertTo-Json
                 if ($seen.ContainsKey($k)) {
-				    Write-Verbose "Omitting $inp"
+				    Write-Debug "Select-Unique Omitting $inp"
 			    } else {
 				    $seen[$k] = $true
 				    $inp

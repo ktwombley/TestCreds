@@ -2,18 +2,6 @@
 
 Set-StrictMode -Version "Latest"
 
-$trustedRemoteHosts = @()
-
-$superpowerhost = ""
-
-$smtp = ""
-$from = ""
-
-$RT_URIStem = ""
-
-
-#$fireid_to = @()
-
 #endregion
 
 

@@ -105,7 +105,7 @@ function Search-ADUser {
     )
     Begin {
         if((Get-PSCallStack)[1].Command -eq (Get-PSCallStack)[0].Command) {
-            Write-Verbose "I was called recursively. I promise to behave."
+            Write-Debug "I was called recursively. I promise to behave."
             $AmChildCall = $true
         } else {
             $AmChildCall = $false
@@ -115,9 +115,9 @@ function Search-ADUser {
 
         if(-not $Properties) {
             $Properties = "DisplayName", "mail", "DistinguishedName", "Enabled", "LockedOut", "GivenName", "Name", "sAMAccountName","SID"
-            Write-Verbose "$($Pad)Using default properties: $Properties"
+            Write-Debug "$($Pad)Using default properties: $Properties"
         } else {
-            Write-Verbose "$($Pad)Using supplied properties: $Properties"
+            Write-Debug "$($Pad)Using supplied properties: $Properties"
         }
         #this array is sorted by quality; more specific stuff up front, more generic in the rear. This helps while guessing search criteria later.
         #$searches = "CN", "DisplayName", "mail", "EmployeeNumber", "mail", "mailNickname", "Name", "sAMAccountName", "sn", "ServicePrincipalNames", "Description", "objectSID", "physicalDeliveryOfficeName", "telephoneNumber", "pager", "physicalDeliveryOfficeName", "telephoneNumber", "uid", "UserPrincipalName", "GivenName", "EmployeeID" 
@@ -167,7 +167,7 @@ $searches = @{
                         }
                     }
                     foreach ($r in $rm_me) {
-                        Write-Verbose "Removing $($r) from searches because it is not in your AD schema."
+                        Write-Debug "Removing $($r) from searches because it is not in your AD schema."
                         $searches[$k].Remove($r) | Out-Null
                     }
                 }
@@ -242,7 +242,7 @@ $searches = @{
                 }
 
                 if ($found_search -lt $searches.Count) {
-                    Write-Verbose "$($Pad)Searching for $Find_criteria found in attribute $($searches[$found_search]) of object"
+                    Write-Debug "$($Pad)Searching for $Find_criteria found in attribute $($searches[$found_search]) of object"
                     $Find = $Find_criteria
                 } else {
                     $afind = $afind.ToString()
@@ -259,9 +259,9 @@ $searches = @{
                 $FindProperties = "*"
                 $FilterProperties = @()
             }
-            Write-Verbose "$($Pad)User wants these properties: $($Properties)"
-            Write-Verbose "$($Pad)Searching for these properties: $($FindProperties)"
-            Write-Verbose "$($Pad)Planning on removing these properties: $($FilterProperties)"
+            Write-Debug "$($Pad)User wants these properties: $($Properties)"
+            Write-Debug "$($Pad)Searching for these properties: $($FindProperties)"
+            Write-Debug "$($Pad)Planning on removing these properties: $($FilterProperties)"
             [System.Collections.ArrayList]$Search_Results = @()
 
             ###
@@ -275,7 +275,7 @@ $searches = @{
                 try {
                     #This search sufficient for lots of inputs.
                     $Search_Results.AddRange(@(Get-ADUser -Filter "sAMAccountName -like `"*$afind*`" -or mail -like `"*$afind*`" -or DisplayName -like `"*$afind*`"" -Properties $FindProperties))
-                    Write-Verbose "$($Pad)  Basic search found $($Search_Results.Count) results."
+                    Write-Debug "$($Pad)  Basic search found $($Search_Results.Count) results."
                 } catch {
                     #I guess there's no results?
                 }        
@@ -289,14 +289,14 @@ $searches = @{
             $oldcount = $Search_Results.Count
             if ($oldcount -eq 0 -or $Thorough) {
                 Write-Progress -Activity "Searching for $afind" -Id $ProgressID -PercentComplete (100*(2/$MaxSearchSteps)) -CurrentOperation "Thorough search"  -ParentId $ParentProgressID
-                Write-Verbose "$($Pad)  Trying thorough search."
+                Write-Debug "$($Pad)  Trying thorough search."
                 $i = 0
                 $Search_Results.AddRange(@($Searches_to_Perform | ForEach-Object {
                     Write-Progress -Activity "Searching for $afind" -Status "Thorough Search" -CurrentOperation "$PSItem" -PercentComplete (100*$i++/$Searches_to_Perform.Count) -ParentId $ProgressID -Id ($ProgressID+2)
                     Get-ADUser -Filter "$($PSItem) -like `"*$afind*`"" -Properties $FindProperties
                 }))
                 Write-Progress -Activity "Searching for $afind" -Status "Thorough Search Done" -Completed -ParentId $ProgressID -Id ($ProgressID+2)
-                Write-Verbose "$($Pad)  Thorough search found $($Search_Results.Count-$oldcount) results."
+                Write-Debug "$($Pad)  Thorough search found $($Search_Results.Count-$oldcount) results."
             }
 
             ###
@@ -307,7 +307,7 @@ $searches = @{
             $oldcount = $Search_Results.Count
             if ($Recurse -and ($oldcount -eq 0 -or $Thorough)) {
                 Write-Progress -Activity "Searching for $afind" -Id $ProgressID -PercentComplete (100*(3/$MaxSearchSteps)) -CurrentOperation "Name reverse search"  -ParentId $ParentProgressID
-                Write-Verbose "$($Pad)  Trying name reverse search: Doe, John -> John Doe; John Doe -> Doe, John."
+                Write-Debug "$($Pad)  Trying name reverse search: Doe, John -> John Doe; John Doe -> Doe, John."
 
                 $fname = $null
                 $mname = $null
@@ -417,7 +417,7 @@ $searches = @{
                 $i = 0
  
                 $results_agg = @{}
-                Write-Verbose "$($Pad)  Doing $($namesearch.Count) name reverse subsearches."
+                Write-Debug "$($Pad)  Doing $($namesearch.Count) name reverse subsearches."
 
                 foreach ($anamesearch in $namesearch) {
                     Write-Progress -Activity "Searching for $afind" -Id ($ProgressID+3) -PercentComplete (100*($i++/$namesearch.Count)) -CurrentOperation $anamesearch -ParentId $ProgressID
@@ -438,7 +438,7 @@ $searches = @{
                 }
 
                 $Search_Results.AddRange(@($results_agg.Values))
-                Write-Verbose "$($Pad)  Name reverse search found $($Search_Results.Count-$oldcount) results."
+                Write-Debug "$($Pad)  Name reverse search found $($Search_Results.Count-$oldcount) results."
             }
 
             ###
@@ -449,14 +449,14 @@ $searches = @{
             $oldcount = $Search_Results.Count
             if ($Recurse -and ($oldcount -eq 0 -or $Thorough)) {
                 Write-Progress -Activity "Searching for $afind" -Id $ProgressID -PercentComplete (100*(4/$MaxSearchSteps)) -CurrentOperation "Email chunk search"  -ParentId $ParentProgressID
-                 Write-Verbose "$($Pad)  Trying email address search: jane.smith@example.com -> 'jane smith'"
+                 Write-Debug "$($Pad)  Trying email address search: jane.smith@example.com -> 'jane smith'"
                 
                 ($un, $dom) = $afind.Split('@')
                 $searchparts =  @($un -split '\.|\s+' | Where-Object Length -ge $UsefulStrLen) -ne $afind
                 if ($searchparts) {
                     $emailchunks = @($searchparts) -join " "
                     if ($emailchunks -ne $afind) {
-                        Write-Verbose "$($Pad)  Doing subsearch for $($emailchunks) from email address: $afind."
+                        Write-Debug "$($Pad)  Doing subsearch for $($emailchunks) from email address: $afind."
                         #Original search was an email address, so this recursion is OK; we will not get caught in a loop. ...I think.
                         $subres = Search-ADUser -Find $emailchunks -Properties $FindProperties -Hint Name -UsefulStrLen $UsefulStrLen -Recurse $True -RecurseDepth ($RecurseDepth+1) -ProgressID ($ProgressID+40)  -ParentProgressID $ProgressID
                         foreach ($r in $subres) {
@@ -466,7 +466,7 @@ $searches = @{
                         $Search_Results.AddRange(@($results_agg.Values))
                     }
                 }
-                Write-Verbose "$($Pad)  Email search found $($Search_Results.Count-$oldcount) results."
+                Write-Debug "$($Pad)  Email search found $($Search_Results.Count-$oldcount) results."
             }
 
 
@@ -482,7 +482,7 @@ $searches = @{
                 Write-Warning "$($Pad)      You may get false positives."
                 # We have found nothing so far. Proceed grasping at straws by exploding the text and looking for substrings."
                 $searchparts =  $afind -split '\W+' | Where-Object Length -ge $UsefulStrLen
-                Write-Verbose "$($Pad)  Substrings found $($searchparts.Count) strings from query: $afind."
+                Write-Debug "$($Pad)  Substrings found $($searchparts.Count) strings from query: $afind."
                 if ($searchparts.Count -gt 0) {
                     $results_agg = @{}
                     $i=0
@@ -497,7 +497,7 @@ $searches = @{
                     }
                     $Search_Results.AddRange(@($results_agg.Values))
                 }
-                Write-Verbose "$($Pad)  Substrings search found $($Search_Results.Count-$oldcount) results. Good luck!"
+                Write-Debug "$($Pad)  Substrings search found $($Search_Results.Count-$oldcount) results. Good luck!"
             }
             Write-Progress -Status "Done" -Activity "Searching for $afind" -Complete -Id $ProgressID  -ParentId $ParentProgressID
         }
@@ -507,12 +507,12 @@ $searches = @{
                 foreach ($a_search in $FilterProperties) {
                     $a_prop_val = $a_result | Select-Object -ExpandProperty $a_search -ErrorAction SilentlyContinue
                     if((-not $a_prop_val) -or $a_prop_val -notlike "*$afind*") {
-                        #Write-Verbose "$($Pad)Culling $a_search since its value is $a_prop_val"
+                        #Write-Debug "$($Pad)Culling $a_search since its value is $a_prop_val"
                         $a_result = $a_result | Select-Object -Property * -ExcludeProperty $a_search
                         #$a_result.PropertyNames = $a_result.PropertyNames | ForEach-Object {if($a_search -ne $PSItem) { $PSItem } }
                     }
                     else {
-                        #Write-Verbose "$($Pad)Keeping $a_search since its value is $a_prop_val"
+                        #Write-Debug "$($Pad)Keeping $a_search since its value is $a_prop_val"
                     }
                 }
             }

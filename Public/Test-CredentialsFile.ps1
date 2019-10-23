@@ -333,7 +333,7 @@ function Test-CredentialsFile
                                     write-warning "$($email): Account $($afound.SamAccountName) has recently failed to login."
                                 }
                             } else {
-                                Write-Verbose "Skipping expensive Get-RealLastBadPasswordAttempt because we aren't going to check the password anyhow."
+                                Write-Debug "Skipping expensive Get-RealLastBadPasswordAttempt because we aren't going to check the password anyhow."
                             }
                         }
 
@@ -438,7 +438,7 @@ function Test-CredentialsFile
                 $req = Get-ADDefaultDomainPasswordPolicy
             }
             if ($passwd.Length -lt $req.MinPasswordLength) {
-                Write-Verbose "Password for $SamAccountName is too short."
+                Write-Debug "Password for $SamAccountName is too short."
                 return $false
             }
             if ($req.ComplexityEnabled) {
@@ -450,18 +450,18 @@ function Test-CredentialsFile
                 $complex_level += ($passwd -creplace '[A-Za-z0-9~!@#$%^&*_\-+=`|\(){}[\]:;"''<>,.?/]','').Length -gt 0
 
                 if ($complex_level -lt 3) {
-                    Write-Verbose "Password for $SamAccountName has $complex_level character classes, needs at least 3."
+                    Write-Debug "Password for $SamAccountName has $complex_level character classes, needs at least 3."
                     return $false
                 }
 
                 $displayname = (get-aduser -Identity $SamAccountName -Properties DisplayName | Select-Object -ExpandProperty DisplayName).ToLower()
 
                 if ($passwd.ToLower().Contains($displayname)) {
-                    Write-Verbose "Password for $SamAccountName contains DisplayName ($displayname)"
+                    Write-Debug "Password for $SamAccountName contains DisplayName ($displayname)"
                     return $false
                 }
                 if ($passwd.ToLower().Contains($SamAccountName.ToLower())) {
-                    Write-Verbose "Password for $SamAccountName contains SamAccountName ($SamAccountName)"
+                    Write-Debug "Password for $SamAccountName contains SamAccountName ($SamAccountName)"
                     return $false
                 }
 
@@ -507,7 +507,7 @@ function Test-CredentialsFile
                         } else {
                             $x = fail_line $PSItem "Could not find a username from the line: $($linecount):[$($PSItem)]"
                             $results.AddRange(@($x)) | Out-Null
-                            $x
+                            if ($DestPath) { if ($DestPath) { Write-Verbose ($x | Out-String) } else { $x } } else { $x }
                             write-warning "Could not find a username from the line: $($linecount):[$($PSItem)]"
                         }
                     }
@@ -523,11 +523,11 @@ function Test-CredentialsFile
                             $u,$p = $PSItem -split $Separator
                             $x = test-acred $u $p ($ProgressID+201) ($ProgressID+2)
                             $results.AddRange(@($x)) | Out-Null
-                            $x
+                            if ($DestPath) { Write-Verbose ($x | Out-String) } else { $x }
                         } else {
                             $x = fail_line $PSItem "Could not split this line with sep '$($Separator)'. $($linecount):[$($PSItem)]"
                             $results.AddRange(@($x)) | Out-Null
-                            $x
+                            if ($DestPath) { Write-Verbose ($x | Out-String) } else { $x }
                             write-warning "Could not split this line with sep '$($Separator)'. $($linecount):[$($PSItem)]"
                         }
                     }
@@ -545,14 +545,14 @@ function Test-CredentialsFile
                 ($u, $p) = $aval -split $Separator
                 $x = test-acred $u $p ($ProgressID+101) ($ProgressID)
                 $results.AddRange(@($x)) | Out-Null
-                $x
+                if ($DestPath) { Write-Verbose ($x | Out-String) } else { $x }
             }
             Write-Progress -Id $ProgressID -ParentId $ParentProgressID -Activity "Checking Creds" -Status "Done with values" -Completed
         } elseif($Name -and $Password) {
             Write-Progress -Activity "Checking Creds" -Status "Checking $Name" -Id $ProgressID -ParentId $ParentProgressID
             $x = test-acred $Name $Password ($ProgressID+101) ($ProgressID)
             $results.AddRange(@($x)) | Out-Null
-            $x
+            if ($DestPath) { Write-Verbose ($x | Out-String) } else { $x }
             Write-Progress -Activity "Checking Creds" -Status "Checking $Name" -Id $ProgressID -ParentId $ParentProgressID -Completed
         }
 
