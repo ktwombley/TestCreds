@@ -463,7 +463,7 @@ function Search-ADUser {
             $a_result = $PSItem
             if(-not $AmChildCall) {
                 foreach ($a_search in $FilterProperties) {
-                    $a_prop_val = $a_result | select -ExpandProperty $a_search -ErrorAction SilentlyContinue
+                    $a_prop_val = $a_result | Select-Object -ExpandProperty $a_search -ErrorAction SilentlyContinue
                     if((-not $a_prop_val) -or $a_prop_val -notlike "*$afind*") {
                         #Write-Verbose "$($Pad)Culling $a_search since its value is $a_prop_val"
                         $a_result = $a_result | Select-Object -Property * -ExcludeProperty $a_search
