@@ -42,9 +42,9 @@ function Get-RealLastBadPasswordAttempt
     Process
     {
         if($All) {
-            Get-ADUserFromAllDCs $Identity LastBadPasswordAttempt -All -ProgressID $ProgressID -ParentProgressID $ParentProgressID
+            Get-ADUserFromEachDC $Identity LastBadPasswordAttempt -All -ProgressID $ProgressID -ParentProgressID $ParentProgressID
         } else {
-            Get-ADUserFromAllDCs $Identity LastBadPasswordAttempt -Aggregation Maximum -ProgressID $ProgressID -ParentProgressID $ParentProgressID
+            Get-ADUserFromEachDC $Identity LastBadPasswordAttempt -Aggregation Maximum -ProgressID $ProgressID -ParentProgressID $ParentProgressID
         }
     }
 

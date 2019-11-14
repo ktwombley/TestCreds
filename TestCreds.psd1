@@ -66,16 +66,16 @@ Description = 'Test leaked credentials against Active Directory'
 # NestedModules = @()
 
 # Functions to export from this module
-FunctionsToExport = '*'
+FunctionsToExport = @()
 
 # Cmdlets to export from this module
-CmdletsToExport = '*'
+CmdletsToExport = @('Test-CredentialsFile','Search-ADUser','Test-ADAuthentication','Test-PasswordValidates','Get-ADUserFromEachDC','Get-RealLastBadPasswordAttempt')
 
 # Variables to export from this module
-VariablesToExport = '*'
+VariablesToExport = @()
 
 # Aliases to export from this module
-AliasesToExport = '*'
+AliasesToExport = @()
 
 # DSC resources to export from this module
 # DscResourcesToExport = @()
@@ -92,13 +92,13 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        # Tags = @()
+        # Tags = @('active-directory')
 
         # A URL to the license for this module.
         # LicenseUri = 'http://www.apache.org/licenses/LICENSE-2.0'
 
         # A URL to the main website for this project.
-        # ProjectUri = ''
+        # ProjectUri = 'https://github.com/ktwombley/TestCreds'
 
         # A URL to an icon representing this module.
         # IconUri = ''
