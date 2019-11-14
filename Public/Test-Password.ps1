@@ -143,6 +143,7 @@ function Test-PasswordValidates
     [CmdletBinding()]
     [Alias()]
     [OutputType([int])]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingPlainTextForPassword", "", Justification="Used for validating plain-text passwords in the first place")]
     Param
     (
         # Whose password are we checking
@@ -205,7 +206,7 @@ function Test-PasswordValidates
         if ($ret -eq [TestCreds.NetPWChk+NET_API_STATUS]::NERR_Success) {
             $OutputArg = [Runtime.InteropServices.Marshal]::PtrToStructure($OutputArgPtr, [System.Type][TestCreds.NetPwChk+NET_VALIDATE_OUTPUT_ARG])    
 
-            write-verbose ($outputArg.ValidationStatus | Out-String)
+            Write-Debug ($outputArg.ValidationStatus | Out-String)
             if ($AsString) {
                 $retval = [string]($outputArg.ValidationStatus)
             } elseif ($AsException) {

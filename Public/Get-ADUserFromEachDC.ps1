@@ -198,7 +198,7 @@ function Get-ADUserFromAllDCs
             $Properties | Foreach-Object -Begin { $i_props=0 } -Process {
                 $Property_name = $PSItem
                 $i_props++
-                $props = $all_results | Select-Object -ExpandProperty $Property_name -ErrorAction "SilentlyContinue"
+                $props = @($all_results | Select-Object -ExpandProperty $Property_name -ErrorAction "SilentlyContinue")
                 Write-Verbose "Working on $Property_name, $($props.Count) results"
 
                 Write-Progress -Activity "Getting $Identity from $progress_servers." -CurrentOperation "Examining $Property_name" -PercentComplete ([int](100 * ($i+($i_props-1)*$progress_total_aggs) / $progress_total)) -Id $ProgressID -ParentId $ParentProgressID

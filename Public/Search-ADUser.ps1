@@ -20,24 +20,21 @@
    * CN
    * Description
    * DisplayName
-   * EmailAddress
+   * mail
    * EmployeeID
    * EmployeeNumber
    * GivenName
-   * mail
    * mailNickname
    * msRTCSIP-PrimaryUserAddress
    * Name
    * objectSid
-   * Office
-   * OfficePhone
+   * physicalDeliveryOfficeName (Office)
+   * telephoneNumber (OfficePhone)
    * pager
    * physicalDeliveryOfficeName
-   * SamAccountName
+   * sAMAccountName
    * ServicePrincipalNames
-   * SID
-   * sn
-   * Surname
+   * sn (Surname)
    * telephoneNumber
    * uid
    * UserPrincipalName
@@ -108,7 +105,7 @@ function Search-ADUser {
     )
     Begin {
         if((Get-PSCallStack)[1].Command -eq (Get-PSCallStack)[0].Command) {
-            Write-Verbose "I was called recursively. I promise to behave."
+            Write-Debug "I was called recursively. I promise to behave."
             $AmChildCall = $true
         } else {
             $AmChildCall = $false
@@ -117,20 +114,65 @@ function Search-ADUser {
         $Pad = " " * $RecurseDepth
 
         if(-not $Properties) {
-            $Properties = "DisplayName", "EmailAddress", "DistinguishedName", "Enabled", "LockedOut", "GivenName", "Name", "SamAccountName","SID"
-            Write-Verbose "$($Pad)Using default properties: $Properties"
+            $Properties = "DisplayName", "mail", "DistinguishedName", "Enabled", "LockedOut", "GivenName", "Name", "sAMAccountName","SID"
+            Write-Debug "$($Pad)Using default properties: $Properties"
         } else {
-            Write-Verbose "$($Pad)Using supplied properties: $Properties"
+            Write-Debug "$($Pad)Using supplied properties: $Properties"
         }
         #this array is sorted by quality; more specific stuff up front, more generic in the rear. This helps while guessing search criteria later.
-        #$searches = "CN", "DisplayName", "EmailAddress", "EmployeeNumber", "mail", "mailNickname", "Name", "SamAccountName", "sn", "Surname", "ServicePrincipalNames", "Description", "objectSid", "Office", "OfficePhone", "pager", "physicalDeliveryOfficeName", "SID", "telephoneNumber", "uid", "UserPrincipalName", "GivenName", "EmployeeID" 
-        #$searches = "CN", "DisplayName", "DistinguishedName", "EmailAddress", "EmployeeNumber", "GivenName", "HomeDirectory", "mail", "mailNickname", "MobilePhone", "ipPhone", "Name", "OfficePhone", "proxyAddresses", "SamAccountName", "SID", "sn", "Surname", "telephoneNumber", "UserPrincipalName", "Description", "State", "StreetAddress", "Title", "Fax", "LogonWorkstations", "departmentNumber", "Division", "homeMDB", "Office", "physicalDeliveryOfficeName", "City", "Department", "Organization", "Company", "msExchDelegateListBL", "msExchHomeServerName"
+        #$searches = "CN", "DisplayName", "mail", "EmployeeNumber", "mail", "mailNickname", "Name", "sAMAccountName", "sn", "ServicePrincipalNames", "Description", "objectSID", "physicalDeliveryOfficeName", "telephoneNumber", "pager", "physicalDeliveryOfficeName", "telephoneNumber", "uid", "UserPrincipalName", "GivenName", "EmployeeID" 
+        #$searches = "CN", "DisplayName", "DistinguishedName", "mail", "EmployeeNumber", "GivenName", "HomeDirectory", "mail", "mailNickname", "mobile", "ipPhone", "Name", "telephoneNumber", "proxyAddresses", "sAMAccountName", "objectSID", "sn", "telephoneNumber", "UserPrincipalName", "Description", "st", "StreetAddress", "Title", "facsimileTelephoneNumber", "userWorkstations", "departmentNumber", "Division", "homeMDB", "physicalDeliveryOfficeName", "physicalDeliveryOfficeName", "l", "department", "o", "Company", "msExchDelegateListBL", "msExchHomeServerName"
 
-        $searches = @{
-            Freetext = "CN", "DisplayName", "DistinguishedName", "EmailAddress", "EmployeeNumber", "GivenName", "HomeDirectory", "mailNickname", "MobilePhone", "ipPhone", "Name", "OfficePhone", "proxyAddresses", "SamAccountName", "SID", "Surname", "UserPrincipalName", "Description", "State", "StreetAddress", "Title", "Fax", "LogonWorkstations", "departmentNumber", "Division", "Office", "City", "Department", "Organization", "Company", "msExchDelegateListBL"
-            Email = "EmailAddress", "proxyAddresses", "UserPrincipalName", "Description", "mailNickname"
-            Number = "EmployeeNumber", "HomeDirectory", "mailNickname", "MobilePhone", "ipPhone", "OfficePhone", "proxyAddresses", "SamAccountName", "SID", "UserPrincipalName", "Description", "StreetAddress", "Fax", "Office", "msExchDelegateListBL"
-            Name = "DisplayName", "GivenName", "Name", "Surname"
+$searches = @{
+    Freetext = [System.Collections.ArrayList]@("cn", "displayName", "distinguishedName", "mail", "employeeNumber", "givenName", "homeDirectory", "mailNickname", "mobile", "ipPhone", "Name", "telephoneNumber", "proxyAddresses", "sAMAccountName", "objectSID", "sn", "userPrincipalName", "description", "st", "StreetAddress", "title", "facsimileTelephoneNumber", "userWorkstations", "departmentNumber", "division", "physicalDeliveryOfficeName", "l", "department", "o", "company", "msExchDelegateListBL")
+    Email = [System.Collections.ArrayList]@("mail", "proxyAddresses", "userPrincipalName", "description", "mailNickname")
+    Number = [System.Collections.ArrayList]@("employeeNumber", "homeDirectory", "mailNickname", "mobile", "ipPhone", "telephoneNumber", "proxyAddresses", "sAMAccountName", "objectSID", "UserPrincipalName", "description", "streetAddress", "facsimileTelephoneNumber", "physicalDeliveryOfficeName", "msExchDelegateListBL")
+    Name = [System.Collections.ArrayList]@("displayName", "givenName", "cn", "sn")
+}
+
+        #Probe AD schema and remove any search attributes which don't exist here.
+        if (-not $AmChildCall) {
+            [System.Collections.ArrayList]$allowed_attribs = @()
+            [System.Collections.Stack]$classes=@()
+            $classes.Push('User') | Out-Null
+            while($classes.Count -gt 0) {
+                $c = Get-ADObject -SearchBase (Get-ADRootDSE).SchemaNamingContext -Filter "ldapDisplayName -eq '$($classes.Pop())'" -Properties 'AuxiliaryClass','SystemAuxiliaryClass','mayContain','mustContain','systemMayContain','systemMustContain','subClassOf','ldapDisplayName'
+                Write-Debug "getting class $($c.Name)"
+                if ($c.ldapDisplayName -ne $c.subClassOf) {
+                    $classes.Push($c.subClassOf) | Out-Null
+                    Write-Debug "pushing $($c.subClassOf)"
+                }
+                $allowed_attribs.AddRange($c.mayContain)
+                $allowed_attribs.AddRange($c.mustContain)
+                $allowed_attribs.AddRange($c.systemMaycontain)
+                $allowed_attribs.AddRange($c.systemMustContain)
+                foreach ($ax in $c.auxiliaryClass) {
+                    $classes.Push($ax) | Out-Null
+                    Write-Debug "pushing $($ax)"
+                }
+                foreach ($sax in $c.systemAuxiliaryClass) {
+                    $classes.Push($sax) | Out-Null
+                    Write-Debug "pushing $($sax)"
+                }
+            }
+            $allowed_attribs = $allowed_attribs.GetEnumerator() | Sort-Object -Unique
+            If ($allowed_attribs.Count -gt 0) {
+                Write-Debug "Culling attribs down to this list: $($allowed_attribs)"
+
+                foreach ($k in $searches.Keys) {
+                    [System.Collections.ArrayList]$rm_me = @()
+                    foreach ($i in $searches[$k]) {
+                        if ($i -notin $allowed_attribs) {
+                            $rm_me.Add($i) | Out-Null
+                        }
+                    }
+                    foreach ($r in $rm_me) {
+                        Write-Debug "Removing $($r) from searches because it is not in your AD schema."
+                        $searches[$k].Remove($r) | Out-Null
+                    }
+                }
+                Write-Debug "Left with these searches: $($searches)"
+            }
         }
 
         function _get_searches($findme) {
@@ -200,7 +242,7 @@ function Search-ADUser {
                 }
 
                 if ($found_search -lt $searches.Count) {
-                    Write-Verbose "$($Pad)Searching for $Find_criteria found in attribute $($searches[$found_search]) of object"
+                    Write-Debug "$($Pad)Searching for $Find_criteria found in attribute $($searches[$found_search]) of object"
                     $Find = $Find_criteria
                 } else {
                     $afind = $afind.ToString()
@@ -217,9 +259,9 @@ function Search-ADUser {
                 $FindProperties = "*"
                 $FilterProperties = @()
             }
-            Write-Verbose "$($Pad)User wants these properties: $($Properties)"
-            Write-Verbose "$($Pad)Searching for these properties: $($FindProperties)"
-            Write-Verbose "$($Pad)Planning on removing these properties: $($FilterProperties)"
+            Write-Debug "$($Pad)User wants these properties: $($Properties)"
+            Write-Debug "$($Pad)Searching for these properties: $($FindProperties)"
+            Write-Debug "$($Pad)Planning on removing these properties: $($FilterProperties)"
             [System.Collections.ArrayList]$Search_Results = @()
 
             ###
@@ -232,8 +274,8 @@ function Search-ADUser {
                 Write-Progress -Activity "Searching for $afind" -Id $ProgressID -PercentComplete (100*(1/$MaxSearchSteps)) -CurrentOperation "Basic search"  -ParentId $ParentProgressID
                 try {
                     #This search sufficient for lots of inputs.
-                    $Search_Results.AddRange(@(Get-ADUser -Filter "SamAccountName -like `"*$afind*`" -or EmailAddress -like `"*$afind*`" -or DisplayName -like `"*$afind*`"" -Properties $FindProperties))
-                    Write-Verbose "$($Pad)  Basic search found $($Search_Results.Count) results."
+                    $Search_Results.AddRange(@(Get-ADUser -Filter "sAMAccountName -like `"*$afind*`" -or mail -like `"*$afind*`" -or DisplayName -like `"*$afind*`"" -Properties $FindProperties))
+                    Write-Debug "$($Pad)  Basic search found $($Search_Results.Count) results."
                 } catch {
                     #I guess there's no results?
                 }        
@@ -247,14 +289,14 @@ function Search-ADUser {
             $oldcount = $Search_Results.Count
             if ($oldcount -eq 0 -or $Thorough) {
                 Write-Progress -Activity "Searching for $afind" -Id $ProgressID -PercentComplete (100*(2/$MaxSearchSteps)) -CurrentOperation "Thorough search"  -ParentId $ParentProgressID
-                Write-Verbose "$($Pad)  Trying thorough search."
+                Write-Debug "$($Pad)  Trying thorough search."
                 $i = 0
                 $Search_Results.AddRange(@($Searches_to_Perform | ForEach-Object {
                     Write-Progress -Activity "Searching for $afind" -Status "Thorough Search" -CurrentOperation "$PSItem" -PercentComplete (100*$i++/$Searches_to_Perform.Count) -ParentId $ProgressID -Id ($ProgressID+2)
                     Get-ADUser -Filter "$($PSItem) -like `"*$afind*`"" -Properties $FindProperties
                 }))
                 Write-Progress -Activity "Searching for $afind" -Status "Thorough Search Done" -Completed -ParentId $ProgressID -Id ($ProgressID+2)
-                Write-Verbose "$($Pad)  Thorough search found $($Search_Results.Count-$oldcount) results."
+                Write-Debug "$($Pad)  Thorough search found $($Search_Results.Count-$oldcount) results."
             }
 
             ###
@@ -265,7 +307,7 @@ function Search-ADUser {
             $oldcount = $Search_Results.Count
             if ($Recurse -and ($oldcount -eq 0 -or $Thorough)) {
                 Write-Progress -Activity "Searching for $afind" -Id $ProgressID -PercentComplete (100*(3/$MaxSearchSteps)) -CurrentOperation "Name reverse search"  -ParentId $ParentProgressID
-                Write-Verbose "$($Pad)  Trying name reverse search: Doe, John -> John Doe; John Doe -> Doe, John."
+                Write-Debug "$($Pad)  Trying name reverse search: Doe, John -> John Doe; John Doe -> Doe, John."
 
                 $fname = $null
                 $mname = $null
@@ -375,7 +417,7 @@ function Search-ADUser {
                 $i = 0
  
                 $results_agg = @{}
-                Write-Verbose "$($Pad)  Doing $($namesearch.Count) name reverse subsearches."
+                Write-Debug "$($Pad)  Doing $($namesearch.Count) name reverse subsearches."
 
                 foreach ($anamesearch in $namesearch) {
                     Write-Progress -Activity "Searching for $afind" -Id ($ProgressID+3) -PercentComplete (100*($i++/$namesearch.Count)) -CurrentOperation $anamesearch -ParentId $ProgressID
@@ -396,7 +438,7 @@ function Search-ADUser {
                 }
 
                 $Search_Results.AddRange(@($results_agg.Values))
-                Write-Verbose "$($Pad)  Name reverse search found $($Search_Results.Count-$oldcount) results."
+                Write-Debug "$($Pad)  Name reverse search found $($Search_Results.Count-$oldcount) results."
             }
 
             ###
@@ -407,14 +449,14 @@ function Search-ADUser {
             $oldcount = $Search_Results.Count
             if ($Recurse -and ($oldcount -eq 0 -or $Thorough)) {
                 Write-Progress -Activity "Searching for $afind" -Id $ProgressID -PercentComplete (100*(4/$MaxSearchSteps)) -CurrentOperation "Email chunk search"  -ParentId $ParentProgressID
-                 Write-Verbose "$($Pad)  Trying email address search: jane.smith@example.com -> 'jane smith'"
+                 Write-Debug "$($Pad)  Trying email address search: jane.smith@example.com -> 'jane smith'"
                 
                 ($un, $dom) = $afind.Split('@')
                 $searchparts =  @($un -split '\.|\s+' | Where-Object Length -ge $UsefulStrLen) -ne $afind
                 if ($searchparts) {
                     $emailchunks = @($searchparts) -join " "
                     if ($emailchunks -ne $afind) {
-                        Write-Verbose "$($Pad)  Doing subsearch for $($emailchunks) from email address: $afind."
+                        Write-Debug "$($Pad)  Doing subsearch for $($emailchunks) from email address: $afind."
                         #Original search was an email address, so this recursion is OK; we will not get caught in a loop. ...I think.
                         $subres = Search-ADUser -Find $emailchunks -Properties $FindProperties -Hint Name -UsefulStrLen $UsefulStrLen -Recurse $True -RecurseDepth ($RecurseDepth+1) -ProgressID ($ProgressID+40)  -ParentProgressID $ProgressID
                         foreach ($r in $subres) {
@@ -424,7 +466,7 @@ function Search-ADUser {
                         $Search_Results.AddRange(@($results_agg.Values))
                     }
                 }
-                Write-Verbose "$($Pad)  Email search found $($Search_Results.Count-$oldcount) results."
+                Write-Debug "$($Pad)  Email search found $($Search_Results.Count-$oldcount) results."
             }
 
 
@@ -440,7 +482,7 @@ function Search-ADUser {
                 Write-Warning "$($Pad)      You may get false positives."
                 # We have found nothing so far. Proceed grasping at straws by exploding the text and looking for substrings."
                 $searchparts =  $afind -split '\W+' | Where-Object Length -ge $UsefulStrLen
-                Write-Verbose "$($Pad)  Substrings found $($searchparts.Count) strings from query: $afind."
+                Write-Debug "$($Pad)  Substrings found $($searchparts.Count) strings from query: $afind."
                 if ($searchparts.Count -gt 0) {
                     $results_agg = @{}
                     $i=0
@@ -455,7 +497,7 @@ function Search-ADUser {
                     }
                     $Search_Results.AddRange(@($results_agg.Values))
                 }
-                Write-Verbose "$($Pad)  Substrings search found $($Search_Results.Count-$oldcount) results. Good luck!"
+                Write-Debug "$($Pad)  Substrings search found $($Search_Results.Count-$oldcount) results. Good luck!"
             }
             Write-Progress -Status "Done" -Activity "Searching for $afind" -Complete -Id $ProgressID  -ParentId $ParentProgressID
         }
@@ -465,12 +507,12 @@ function Search-ADUser {
                 foreach ($a_search in $FilterProperties) {
                     $a_prop_val = $a_result | Select-Object -ExpandProperty $a_search -ErrorAction SilentlyContinue
                     if((-not $a_prop_val) -or $a_prop_val -notlike "*$afind*") {
-                        #Write-Verbose "$($Pad)Culling $a_search since its value is $a_prop_val"
+                        #Write-Debug "$($Pad)Culling $a_search since its value is $a_prop_val"
                         $a_result = $a_result | Select-Object -Property * -ExcludeProperty $a_search
                         #$a_result.PropertyNames = $a_result.PropertyNames | ForEach-Object {if($a_search -ne $PSItem) { $PSItem } }
                     }
                     else {
-                        #Write-Verbose "$($Pad)Keeping $a_search since its value is $a_prop_val"
+                        #Write-Debug "$($Pad)Keeping $a_search since its value is $a_prop_val"
                     }
                 }
             }
